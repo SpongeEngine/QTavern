@@ -10,6 +10,7 @@ On Linux:
 ```bash
 ./start_linux.sh
 ```
+https://developer.nvidia.com/cuda-downloads
 On Windows:
 ```powershell
 .\start_windows.ps1
