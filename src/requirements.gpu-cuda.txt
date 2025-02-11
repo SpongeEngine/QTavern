@@ -1,0 +1,15 @@
+# Quantization-related packages
+torch==2.6.0
+optimum
+accelerate
+zstandard
+
+# Pin compatible versions to avoid import errors:
+transformers==4.43.1
+peft==0.10.0
+auto-gptq==0.7.1
+
+# UI and core libraries
+gradio==5.15.0
+huggingface_hub
+numpy==1.25.0

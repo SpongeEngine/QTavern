@@ -1,0 +1,101 @@
+# -------------------------------------------------------------------------------
+# Use a plain Ubuntu image for CPU-only mode.
+# -------------------------------------------------------------------------------
+FROM ubuntu:22.04
+
+# -------------------------------------------------------------------------------
+# Disable interactive prompts.
+# -------------------------------------------------------------------------------
+ENV DEBIAN_FRONTEND=noninteractive
+
+# -------------------------------------------------------------------------------
+# Install required system dependencies.
+# -------------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    ninja-build \
+    python3 \
+    python3-pip \
+    libssl-dev \
+    libffi-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# -------------------------------------------------------------------------------
+# Set the working directory.
+# -------------------------------------------------------------------------------
+WORKDIR /app
+
+# -------------------------------------------------------------------------------
+# Create a cache directory and set environment variables.
+# -------------------------------------------------------------------------------
+RUN mkdir -p /app/.cache && chmod -R 777 /app/.cache
+ENV HF_HOME=/app/.cache
+ENV HOME=/app
+
+# -------------------------------------------------------------------------------
+# Copy the requirements file.
+# -------------------------------------------------------------------------------
+COPY ./app/requirements.cpu.txt /app/
+
+# -------------------------------------------------------------------------------
+# Upgrade pip.
+# -------------------------------------------------------------------------------
+RUN python3 -m pip install --upgrade pip==25.0
+
+# -------------------------------------------------------------------------------
+# Install torch (CPU version; the available wheel will be CPU-compatible).
+# -------------------------------------------------------------------------------
+RUN python3 -m pip install torch==2.6.0
+
+# -------------------------------------------------------------------------------
+# Create a dummy CUDA directory structure so that packages expecting CUDA paths can find them.
+# -------------------------------------------------------------------------------
+RUN mkdir -p /usr/local/cuda/lib64 && mkdir -p /usr/local/cuda/include
+
+# -------------------------------------------------------------------------------
+# Set CUDA-related environment variables.
+# -------------------------------------------------------------------------------
+ENV CUDA_HOME=/usr/local/cuda
+ENV CUDA_PATH=/usr/local/cuda
+
+# -------------------------------------------------------------------------------
+# Disable CUDA support in auto-gptq and signal CPU mode.
+# -------------------------------------------------------------------------------
+ENV AUTO_GPTQ_NO_CUDA=1
+ENV CUDA_VERSION=0.0
+ENV SPONGEQUANT_CPU_MODE=1
+
+# -------------------------------------------------------------------------------
+# Pre-install numpy so that auto-gptq's setup script can initialize it.
+# -------------------------------------------------------------------------------
+RUN python3 -m pip install numpy
+
+# -------------------------------------------------------------------------------
+# Install the rest of the Python dependencies.
+# -------------------------------------------------------------------------------
+RUN python3 -m pip install -r requirements.cpu.txt
+
+# -------------------------------------------------------------------------------
+# Install llama_cpp (llama-quantize doesn't seem to be available when installing via pip).
+# -------------------------------------------------------------------------------
+# Clone the llama.cpp repository.
+RUN git clone https://github.com/ggerganov/llama.cpp.git /app/llama_cpp
+# Build the binaries.
+WORKDIR /app/llama_cpp
+RUN mkdir build && cd build && cmake -G Ninja .. && ninja
+
+# -------------------------------------------------------------------------------
+# Copy the rest of your application files.
+# -------------------------------------------------------------------------------
+COPY ./app /app
+WORKDIR /app
+
+# -------------------------------------------------------------------------------
+# Expose the port (for Gradio UI, for example) and set the entrypoint.
+# -------------------------------------------------------------------------------
+EXPOSE 7860
+CMD ["python3", "app.py"]
