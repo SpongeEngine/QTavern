@@ -5,7 +5,7 @@ accelerate
 zstandard
 
 # Pin compatible versions to avoid import errors:
-transformers==4.43.1
+transformers==4.48.0
 peft==0.10.0
 # auto-gptq is omitted on CPU-only builds
 
