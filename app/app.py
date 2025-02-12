@@ -445,7 +445,7 @@ def build_llama_cmd(script_name: str, *args):
         return f'"{sys.executable}" "{script_path}" ' + " ".join(str(arg) for arg in args)
     else:
         exec_path = os.path.join("llama_cpp", "build", "bin", script_name)
-        return f'"{exec_path}"' + " ".join(str(arg) for arg in args)
+        return f'"{exec_path}" ' + " ".join(str(arg) for arg in args)
 
 # ---------------------------
 # Quantization Method Implementations
