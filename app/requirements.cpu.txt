@@ -1,0 +1,15 @@
+# Quantization-related packages
+# torch==2.6.0
+optimum
+accelerate
+zstandard
+transformers==4.48.0
+peft==0.10.0
+
+# UI and core libraries
+gradio==5.15.0
+huggingface_hub
+numpy==1.25.0
+
+# For llama_cpp/gguf-py/gguf/vocab.py
+sentencepiece==0.1.96

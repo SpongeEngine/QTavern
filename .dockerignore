@@ -1,0 +1,9 @@
+# Exclude model directories and local artifacts
+models/
+quantized_models/
+
+# Exclude version control files and temporary files
+.git
+.gitignore
+**/__pycache__/
+**/*.pyc

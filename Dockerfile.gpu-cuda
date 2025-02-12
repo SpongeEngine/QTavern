@@ -1,0 +1,107 @@
+# Use an NVIDIA CUDA devel image (with CUDA 12.2)
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+
+# Disable interactive prompts.
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Support a wide range of CUDA architectures.
+ENV TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0"
+
+# -------------------------------------------------------------------------------
+# Install system-level dependencies.
+# -------------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    ninja-build \
+    python3 \
+    python3-pip \
+    libssl-dev \
+    libffi-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# -------------------------------------------------------------------------------
+# Set the working directory.
+# -------------------------------------------------------------------------------
+WORKDIR /app
+
+# -------------------------------------------------------------------------------
+# Create a writable cache directory for Hugging Face and set environment variables.
+# -------------------------------------------------------------------------------
+RUN mkdir -p /app/.cache && chmod -R 777 /app/.cache
+ENV HF_HOME=/app/.cache
+ENV HOME=/app
+
+# -------------------------------------------------------------------------------
+# Copy only the requirements file to leverage Docker cache.
+# -------------------------------------------------------------------------------
+COPY ./app/requirements.gpu-cuda.txt /app/
+
+# -------------------------------------------------------------------------------
+# Upgrade pip.
+# -------------------------------------------------------------------------------
+RUN python3 -m pip install --upgrade pip==25.0
+
+# -------------------------------------------------------------------------------
+# Force-install torch first so that auto-gptq’s metadata generation finds it.
+# -------------------------------------------------------------------------------
+RUN python3 -m pip install torch==2.6.0
+
+# -------------------------------------------------------------------------------
+# Install Python dependencies from the requirements file.
+# -------------------------------------------------------------------------------
+RUN python3 -m pip install -r requirements.gpu-cuda.txt
+
+# -------------------------------------------------------------------------------
+# Clone and build llama_cpp (for GGUF quantization).
+# -------------------------------------------------------------------------------
+RUN git clone https://github.com/ggerganov/llama.cpp.git /app/llama_cpp
+WORKDIR /app/llama_cpp
+RUN mkdir build && cd build && \
+    cmake -DGGML_CUDA=ON \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
+          -G Ninja .. && \
+    ninja -j$(nproc)
+
+# -------------------------------------------------------------------------------
+# Clone and build AutoAWQ (for AWQ quantization).
+# -------------------------------------------------------------------------------
+WORKDIR /app
+RUN git clone https://github.com/casper-hansen/AutoAWQ.git /app/AutoAWQ && \
+    cd /app/AutoAWQ && \
+    git checkout v0.2.4 && \
+    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc) && \
+    python3 -m pip install -e .
+
+# -------------------------------------------------------------------------------
+# Clone and install exllamav2 (for EXL2 quantization).
+# -------------------------------------------------------------------------------
+RUN git clone https://github.com/turboderp-org/exllamav2.git /app/exllamav2 && \
+    cd /app/exllamav2 && \
+    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc) && \
+    python3 -m pip install -e . && \
+    cd /app
+
+# -------------------------------------------------------------------------------
+# Copy the rest of the project files.
+# -------------------------------------------------------------------------------
+COPY ./app /app
+
+# -------------------------------------------------------------------------------
+# Reset the working directory to /app.
+# -------------------------------------------------------------------------------
+WORKDIR /app
+
+# -------------------------------------------------------------------------------
+# Expose the port for the Gradio UI.
+# -------------------------------------------------------------------------------
+EXPOSE 7860
+
+# -------------------------------------------------------------------------------
+# Set the entrypoint to run your application.
+# -------------------------------------------------------------------------------
+CMD ["python3", "app.py"]
